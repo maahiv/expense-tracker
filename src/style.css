@@ -208,6 +208,8 @@ body {
   border-top: 1px solid #aaa;
 
   padding: 18px 20px;
+
+  position: relative;
 }
 
 .welcome-header {
@@ -219,6 +221,8 @@ body {
   border-bottom: 1px solid #aaa;
 
   padding-bottom: 10px;
+
+  padding-right: 130px;
 }
 
 .welcome-header h1 {
@@ -261,8 +265,73 @@ body {
   cursor: pointer;
 }
 
+
+/* =========================================
+   LOGOUT BUTTON
+========================================= */
+
 .logout-button {
-  display: none;
+  position: absolute;
+
+  top: 18px;
+  right: 20px;
+
+  padding: 8px 18px;
+
+  background: #e53935;
+  color: white;
+
+  border: none;
+  border-radius: 5px;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  z-index: 20;
+}
+
+.logout-button:hover {
+  background: #c62828;
+}
+
+
+/* =========================================
+   EMAIL VERIFICATION
+========================================= */
+
+.email-verification {
+  position: absolute;
+
+  top: 65px;
+  right: 20px;
+
+  z-index: 10;
+}
+
+.email-verification button {
+  padding: 8px 18px;
+
+  background: #1976d2;
+  color: white;
+
+  border: none;
+  border-radius: 5px;
+
+  font-size: 14px;
+
+  cursor: pointer;
+}
+
+.email-verification button:hover {
+  background: #125ca8;
+}
+
+.email-verification button:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
 }
 
 
@@ -467,5 +536,26 @@ body {
 
   .profile-field input {
     width: 100%;
+  }
+
+  .welcome-header {
+    padding-right: 0;
+
+    flex-direction: column;
+
+    gap: 15px;
+  }
+
+  .logout-button {
+    top: 15px;
+    right: 15px;
+  }
+
+  .email-verification {
+    position: static;
+
+    margin-top: 20px;
+
+    text-align: left;
   }
 }
