@@ -3,6 +3,7 @@ import Login from "./components/Login";
 import Signup from "./components/Signup";
 import Welcome from "./components/Welcome";
 import Profile from "./components/Profile";
+import ForgotPassword from "./components/ForgotPassword";
 
 function App() {
   const [screen, setScreen] = useState(
@@ -11,12 +12,21 @@ function App() {
       : "login"
   );
 
+  if (screen === "forgot-password") {
+  return (
+    <ForgotPassword
+      onBackToLogin={() => setScreen("login")}
+    />
+  );
+}
+
   if (screen === "login") {
     return (
       <Login
-        onSignup={() => setScreen("signup")}
-        onLoginSuccess={() => setScreen("welcome")}
-      />
+  onSignup={() => setScreen("signup")}
+  onLoginSuccess={() => setScreen("welcome")}
+  onForgotPassword={() => setScreen("forgot-password")}
+/>
     );
   }
 

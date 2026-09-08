@@ -5,7 +5,11 @@ import {
 } from "firebase/auth";
 import { auth } from "../firebase";
 
-function Login({ onSignup, onLoginSuccess }) {
+function Login({
+  onSignup,
+  onLoginSuccess,
+  onForgotPassword
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -88,9 +92,13 @@ function Login({ onSignup, onLoginSuccess }) {
 
           </form>
 
-          <a href="#" className="forgot-password">
-            Forgot password
-          </a>
+        <button
+  type="button"
+  className="forgot-password"
+  onClick={onForgotPassword}
+>
+  Forgot password
+</button>
 
         </div>
 
