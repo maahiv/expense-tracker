@@ -1,134 +1,161 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  getIdToken,
+  signInWithEmailAndPassword,
+  signOut
+} from 'firebase/auth';
 import { auth } from './firebase';
 import './style.css';
 
+const TOKEN_KEY = 'expenseTrackerToken';
+
 function App() {
+  const [screen, setScreen] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const isFormComplete =
-    email.trim() !== '' && password !== '' && confirmPassword !== '';
+  useEffect(() => {
+    if (localStorage.getItem(TOKEN_KEY)) setScreen('welcome');
+  }, []);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setError('');
-    setSuccess('');
+  const clearMessages = () => setError('');
 
-    if (!isFormComplete) {
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    if (!email.trim() || !password || !confirmPassword) {
       setError('All fields are required.');
       return;
     }
-
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
     }
 
     setLoading(true);
-
     try {
       await createUserWithEmailAndPassword(auth, email.trim(), password);
       console.log('User has successfully signed up.');
-      setSuccess('Account created successfully!');
+      await signOut(auth);
       setEmail('');
       setPassword('');
       setConfirmPassword('');
+      alert('Account created successfully. Please login to continue.');
+      setScreen('login');
     } catch (err) {
-      switch (err.code) {
-        case 'auth/email-already-in-use':
-          setError('An account already exists with this email.');
-          break;
-        case 'auth/invalid-email':
-          setError('Please enter a valid email address.');
-          break;
-        case 'auth/weak-password':
-          setError('Password should be at least 6 characters.');
-          break;
-        case 'auth/network-request-failed':
-          setError('Network error. Please check your internet connection.');
-          break;
-        case 'auth/operation-not-allowed':
-          setError('Email/password sign-up is not enabled in Firebase.');
-          break;
-        default:
-          setError('Something went wrong. Please try again.');
+      const messages = {
+        'auth/email-already-in-use': 'An account already exists with this email.',
+        'auth/invalid-email': 'Please enter a valid email address.',
+        'auth/weak-password': 'Password should be at least 6 characters.',
+        'auth/network-request-failed': 'Network error. Please check your internet connection.'
+      };
+      setError(messages[err.code] || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    if (!email.trim() || !password) {
+      alert('Please enter both email and password.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const token = await getIdToken(credential.user);
+      localStorage.setItem(TOKEN_KEY, token);
+      setEmail('');
+      setPassword('');
+      setScreen('welcome');
+    } catch (err) {
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+        alert('Invalid email or password. Please try again.');
+      } else if (err.code === 'auth/invalid-email') {
+        alert('Please enter a valid email address.');
+      } else if (err.code === 'auth/network-request-failed') {
+        alert('Network error. Please check your internet connection.');
+      } else {
+        alert('Something went wrong. Please try again.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="page">
-      <header className="navbar">
-        <a className="brand" href="#" aria-label="MyWebLink home">
-          <span className="brand-icon" aria-hidden="true">
-            <span />
-            <span />
-          </span>
-          <span className="brand-text">MyWebLink</span>
-        </a>
+  const handleLogout = async () => {
+    await signOut(auth);
+    localStorage.removeItem(TOKEN_KEY);
+    setScreen('login');
+    setEmail('');
+    setPassword('');
+  };
 
-        <nav className="nav-links" aria-label="Main navigation">
-          <a href="#">Home</a>
-          <a href="#">Products</a>
-          <a href="#">About Us</a>
-        </nav>
+  const isSignup = screen === 'signup';
+
+  if (screen === 'welcome') {
+    return (
+      <div className="welcome-page">
+        <h1>Welcome to Expense Tracker!!!</h1>
+        <button className="welcome-logout" onClick={handleLogout}>Logout</button>
+      </div>
+    );
+  }
+
+  const canSubmit = isSignup
+    ? email.trim() && password && confirmPassword
+    : email.trim() && password;
+
+  return (
+    <div className={`page ${isSignup ? 'signup-screen' : 'login-screen'}`}>
+      <header className="navbar">
+        <div className="brand"><span className="brand-mark">◈</span><span>MyWebLink</span></div>
+        <nav><a href="#">Home</a><a href="#">Products</a><a href="#">About Us</a></nav>
       </header>
 
-      <div className="blue-shape" aria-hidden="true" />
+      <div className="blue-shape" aria-hidden="true"></div>
 
       <main className="content">
-        <section className="signup-area" aria-label="Signup form">
-          <div className="signup-card">
-            <h1>SignUp</h1>
-
-            <form onSubmit={handleSubmit} noValidate>
+        <section className="auth-wrap">
+          <div className="card">
+            <h1>{isSignup ? 'SignUp' : 'Login'}</h1>
+            <form onSubmit={isSignup ? handleSignup : handleLogin} noValidate>
               <input
                 type="email"
                 placeholder="Email"
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
-                aria-label="Email"
-                required
               />
-
               <input
                 type="password"
                 placeholder="Password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="new-password"
-                aria-label="Password"
-                required
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={isSignup ? 'new-password' : 'current-password'}
               />
-
-              <input
-                type="password"
-                placeholder="Confirm Password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                autoComplete="new-password"
-                aria-label="Confirm Password"
-                required
-              />
-
+              {isSignup && (
+                <input
+                  type="password"
+                  placeholder="Confirm Password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              )}
               {error && <p className="message error">{error}</p>}
-              {success && <p className="message success">{success}</p>}
-
-              <button
-                className="signup-button"
-                type="submit"
-                disabled={!isFormComplete || loading}
-              >
-                {loading ? 'Signing up...' : 'Sign up'}
+              <button type="submit" disabled={!canSubmit || loading}>
+                {loading ? (isSignup ? 'Signing up...' : 'Logging in...') : (isSignup ? 'Sign up' : 'Login')}
               </button>
             </form>
           </div>
@@ -136,9 +163,9 @@ function App() {
           <button
             className="login-box"
             type="button"
-            onClick={() => setError('Login screen is available for registered users.')}
+            onClick={() => { clearMessages(); setScreen(isSignup ? 'login' : 'signup'); }}
           >
-            Have an account? Login
+            {isSignup ? 'Have an account? Login' : "Don't have an account? Sign up"}
           </button>
         </section>
       </main>
