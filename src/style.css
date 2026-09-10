@@ -559,3 +559,159 @@ body {
     text-align: left;
   }
 }
+
+/* =========================================
+   EXPENSE TRACKER
+========================================= */
+
+.expense-section {
+  width: 90%;
+  max-width: 900px;
+  margin: 45px auto;
+}
+
+.expense-section h2 {
+  text-align: center;
+  font-size: 22px;
+  margin-bottom: 25px;
+}
+
+.expense-form {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.expense-form input,
+.expense-form select {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #999;
+  border-radius: 5px;
+  background: white;
+  color: #111;
+  font-size: 14px;
+  outline: none;
+}
+
+.expense-form input:focus,
+.expense-form select:focus {
+  border-color: #1976d2;
+}
+
+.expense-form input[type="number"] {
+  width: 150px;
+}
+
+.expense-form input[type="text"] {
+  width: 250px;
+}
+
+.expense-form select {
+  width: 150px;
+}
+
+.expense-form button {
+  height: 38px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 5px;
+  background: #0b9ee9;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.expense-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* Expenses list */
+
+.expenses-list {
+  margin-top: 40px;
+}
+
+.expenses-list h2 {
+  text-align: left;
+  margin-bottom: 15px;
+}
+
+.no-expenses {
+  color: #777;
+  font-style: italic;
+}
+
+.expense-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 14px 18px;
+  margin-bottom: 10px;
+
+  border: 1px solid #ddd;
+  border-radius: 6px;
+
+  background: #fafafa;
+}
+
+.expense-item div {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.expense-item strong {
+  font-size: 16px;
+}
+
+.expense-item span {
+  font-size: 14px;
+}
+
+.expense-category {
+  padding: 5px 10px;
+  border-radius: 12px;
+  background: #e8f1ff;
+  color: #1976d2;
+  font-size: 13px !important;
+}
+
+
+/* Mobile */
+
+@media (max-width: 800px) {
+  .expense-section {
+    width: 90%;
+    margin-top: 35px;
+  }
+
+  .expense-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .expense-form input[type="number"],
+  .expense-form input[type="text"],
+  .expense-form select,
+  .expense-form button {
+    width: 100%;
+  }
+
+  .expense-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .expense-item div {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+}
