@@ -11,6 +11,9 @@ function Welcome({ onCompleteProfile }) {
   const [category, setCategory] = useState("Food");
   const [expenses, setExpenses] = useState([]);
 
+  // Edit state
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
+
   // Get expenses from Firebase when page loads
   useEffect(() => {
     let unsubscribe;
@@ -146,17 +149,60 @@ function Welcome({ onCompleteProfile }) {
         return;
       }
 
-      // Get fresh Firebase ID token
       const idToken = await user.getIdToken(true);
 
-      // Expense data
       const expenseData = {
         amount: amount,
         description: description,
         category: category,
       };
 
-      // POST expense to Firebase Realtime Database
+      // If editing, update existing expense
+      if (editingExpenseId) {
+        const response = await fetch(
+          `${databaseURL}/expenses/${user.uid}/${editingExpenseId}.json?auth=${idToken}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(expenseData),
+          }
+        );
+
+        const data = await response.json();
+
+        if (response.status !== 200) {
+          throw new Error(
+            data?.error ||
+              "Failed to update expense."
+          );
+        }
+
+        // Update screen only after successful response
+        setExpenses((previousExpenses) =>
+          previousExpenses.map((expense) =>
+            expense.id === editingExpenseId
+              ? {
+                  ...expense,
+                  amount: amount,
+                  description: description,
+                  category: category,
+                }
+              : expense
+          )
+        );
+
+        // Reset edit mode
+        setEditingExpenseId(null);
+        setAmount("");
+        setDescription("");
+        setCategory("Food");
+
+        return;
+      }
+
+      // POST new expense
       const response = await fetch(
         `${databaseURL}/expenses/${user.uid}.json?auth=${idToken}`,
         {
@@ -178,7 +224,6 @@ function Welcome({ onCompleteProfile }) {
         );
       }
 
-      // Add only after successful backend response
       const newExpense = {
         id: data.name,
         amount: amount,
@@ -196,11 +241,83 @@ function Welcome({ onCompleteProfile }) {
       setDescription("");
       setCategory("Food");
     } catch (error) {
-      console.error("Error adding expense:", error);
+      console.error("Error saving expense:", error);
 
       alert(
         error.message ||
           "Failed to save expense."
+      );
+    }
+  };
+
+  // Edit expense
+  const handleEditExpense = (expense) => {
+    setEditingExpenseId(expense.id);
+    setAmount(expense.amount);
+    setDescription(expense.description);
+    setCategory(expense.category);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  // Cancel edit
+  const handleCancelEdit = () => {
+    setEditingExpenseId(null);
+    setAmount("");
+    setDescription("");
+    setCategory("Food");
+  };
+
+  // Delete expense
+  const handleDeleteExpense = async (expenseId) => {
+    try {
+      const user = auth.currentUser;
+
+      if (!user) {
+        alert("Please login again.");
+        return;
+      }
+
+      const idToken = await user.getIdToken(true);
+
+      const response = await fetch(
+        `${databaseURL}/expenses/${user.uid}/${expenseId}.json?auth=${idToken}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.status !== 200) {
+        throw new Error(
+          data?.error ||
+            "Failed to delete expense."
+        );
+      }
+
+      // Remove from screen only after successful deletion
+      setExpenses((previousExpenses) =>
+        previousExpenses.filter(
+          (expense) => expense.id !== expenseId
+        )
+      );
+
+      // If deleted expense was being edited
+      if (editingExpenseId === expenseId) {
+        handleCancelEdit();
+      }
+
+      console.log("Expense successfuly deleted");
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+
+      alert(
+        error.message ||
+          "Failed to delete expense."
       );
     }
   };
@@ -252,7 +369,11 @@ function Welcome({ onCompleteProfile }) {
       {/* Expense Section */}
       <div className="expense-section">
 
-        <h2>Add Daily Expense</h2>
+        <h2>
+          {editingExpenseId
+            ? "Edit Expense"
+            : "Add Daily Expense"}
+        </h2>
 
         <form
           className="expense-form"
@@ -303,8 +424,20 @@ function Welcome({ onCompleteProfile }) {
               !description.trim()
             }
           >
-            Add Expense
+            {editingExpenseId
+              ? "Update Expense"
+              : "Add Expense"}
           </button>
+
+          {/* Cancel Edit */}
+          {editingExpenseId && (
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+            >
+              Cancel
+            </button>
+          )}
 
         </form>
 
@@ -323,6 +456,7 @@ function Welcome({ onCompleteProfile }) {
                 className="expense-item"
                 key={expense.id}
               >
+
                 <div>
                   <strong>
                     ₹{expense.amount}
@@ -336,6 +470,30 @@ function Welcome({ onCompleteProfile }) {
                 <span className="expense-category">
                   {expense.category}
                 </span>
+
+                {/* Edit / Delete buttons */}
+                <div className="expense-actions">
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleEditExpense(expense)
+                    }
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleDeleteExpense(expense.id)
+                    }
+                  >
+                    Delete
+                  </button>
+
+                </div>
+
               </div>
             ))
           )}
