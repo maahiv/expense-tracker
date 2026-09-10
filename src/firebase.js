@@ -14,3 +14,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+
+export const databaseURL =
+  "https://expense-tracker-3e596-default-rtdb.firebaseio.com";

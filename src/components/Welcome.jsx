@@ -1,6 +1,6 @@
-import { signOut } from "firebase/auth";
-import { auth } from "../firebase";
-import React, { useState } from "react";
+import { signOut, onAuthStateChanged } from "firebase/auth";
+import { auth, databaseURL } from "../firebase";
+import React, { useEffect, useState } from "react";
 
 function Welcome({ onCompleteProfile }) {
   const [sending, setSending] = useState(false);
@@ -11,6 +11,62 @@ function Welcome({ onCompleteProfile }) {
   const [category, setCategory] = useState("Food");
   const [expenses, setExpenses] = useState([]);
 
+  // Get expenses from Firebase when page loads
+  useEffect(() => {
+    let unsubscribe;
+
+    const loadExpenses = async (user) => {
+      try {
+        const idToken = await user.getIdToken(true);
+
+        localStorage.setItem(
+          "expenseTrackerToken",
+          idToken
+        );
+
+        const response = await fetch(
+          `${databaseURL}/expenses/${user.uid}.json?auth=${idToken}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch expenses.");
+        }
+
+        const data = await response.json();
+
+        if (data) {
+          const expensesArray = Object.entries(data).map(
+            ([id, expense]) => ({
+              id,
+              amount: expense.amount,
+              description: expense.description,
+              category: expense.category,
+            })
+          );
+
+          setExpenses(expensesArray);
+        } else {
+          setExpenses([]);
+        }
+      } catch (error) {
+        console.error("Error fetching expenses:", error);
+      }
+    };
+
+    unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        loadExpenses(user);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  // Logout
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -20,6 +76,7 @@ function Welcome({ onCompleteProfile }) {
     }
   };
 
+  // Verify Email
   const handleVerifyEmail = async () => {
     try {
       setSending(true);
@@ -73,7 +130,7 @@ function Welcome({ onCompleteProfile }) {
   };
 
   // Add expense
-  const handleAddExpense = (e) => {
+  const handleAddExpense = async (e) => {
     e.preventDefault();
 
     if (!amount.trim() || !description.trim()) {
@@ -81,22 +138,71 @@ function Welcome({ onCompleteProfile }) {
       return;
     }
 
-    const newExpense = {
-      id: Date.now(),
-      amount: amount,
-      description: description,
-      category: category,
-    };
+    try {
+      const user = auth.currentUser;
 
-    setExpenses((previousExpenses) => [
-      ...previousExpenses,
-      newExpense,
-    ]);
+      if (!user) {
+        alert("Please login again.");
+        return;
+      }
 
-    // Clear form after adding
-    setAmount("");
-    setDescription("");
-    setCategory("Food");
+      // Get fresh Firebase ID token
+      const idToken = await user.getIdToken(true);
+
+      // Expense data
+      const expenseData = {
+        amount: amount,
+        description: description,
+        category: category,
+      };
+
+      // POST expense to Firebase Realtime Database
+      const response = await fetch(
+        `${databaseURL}/expenses/${user.uid}.json?auth=${idToken}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(expenseData),
+        }
+      );
+
+      const data = await response.json();
+
+      // Only show expense after 200 Success
+      if (response.status !== 200) {
+        throw new Error(
+          data?.error ||
+            "Failed to save expense."
+        );
+      }
+
+      // Add only after successful backend response
+      const newExpense = {
+        id: data.name,
+        amount: amount,
+        description: description,
+        category: category,
+      };
+
+      setExpenses((previousExpenses) => [
+        ...previousExpenses,
+        newExpense,
+      ]);
+
+      // Clear form
+      setAmount("");
+      setDescription("");
+      setCategory("Food");
+    } catch (error) {
+      console.error("Error adding expense:", error);
+
+      alert(
+        error.message ||
+          "Failed to save expense."
+      );
+    }
   };
 
   return (
@@ -158,7 +264,9 @@ function Welcome({ onCompleteProfile }) {
             type="number"
             placeholder="Money spent"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) =>
+              setAmount(e.target.value)
+            }
             min="0"
             step="0.01"
           />
