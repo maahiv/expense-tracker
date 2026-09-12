@@ -11,6 +11,11 @@ const counterReducer = (state = 0, action) => {
 
     case "DECREMENTBY2":
       return state - 2;
+      case "INCREMENTBY5":
+  return state + 5;
+
+case "DECREMENTBY5":
+  return state - 5;
 
     default:
       return state;

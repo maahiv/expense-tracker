@@ -348,6 +348,14 @@ const expenses = useSelector((state) => state.expenses);
     dispatch({ type: "DECREMENTBY2" });
   };
 
+  const incrementBy5 = () => {
+  dispatch({ type: "INCREMENTBY5" });
+};
+
+const decrementBy5 = () => {
+  dispatch({ type: "DECREMENTBY5" });
+};
+
   return (
     <div className="welcome-page">
 
@@ -546,6 +554,13 @@ const expenses = useSelector((state) => state.expenses);
           <button type="button" onClick={decrementBy2}>
             Decrement by 2
           </button>
+          <button type="button" onClick={incrementBy5}>
+  IncrementBy5
+</button>
+
+<button type="button" onClick={decrementBy5}>
+  DecrementBy5
+</button>
         </div>
 
       </div>
