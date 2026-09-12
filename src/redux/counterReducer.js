@@ -6,6 +6,12 @@ const counterReducer = (state = 0, action) => {
     case "decrement":
       return state - 1;
 
+    case "INCREMENTBY2":
+      return state + 2;
+
+    case "DECREMENTBY2":
+      return state - 2;
+
     default:
       return state;
   }
