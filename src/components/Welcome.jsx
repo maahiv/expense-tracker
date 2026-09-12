@@ -1,6 +1,7 @@
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import { auth, databaseURL } from "../firebase";
 import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 
 function Welcome({ onCompleteProfile }) {
   const [sending, setSending] = useState(false);
@@ -9,7 +10,10 @@ function Welcome({ onCompleteProfile }) {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Food");
-  const [expenses, setExpenses] = useState([]);
+ const dispatch = useDispatch();
+
+const expenses = useSelector((state) => state.expenses);
+  const counter = useSelector((state) => state.counter);
 
   // Edit state
   const [editingExpenseId, setEditingExpenseId] = useState(null);
@@ -37,20 +41,26 @@ function Welcome({ onCompleteProfile }) {
 
         const data = await response.json();
 
-        if (data) {
-          const expensesArray = Object.entries(data).map(
-            ([id, expense]) => ({
-              id,
-              amount: expense.amount,
-              description: expense.description,
-              category: expense.category,
-            })
-          );
+       if (data) {
+  const expensesArray = Object.entries(data).map(
+    ([id, expense]) => ({
+      id,
+      amount: expense.amount,
+      description: expense.description,
+      category: expense.category,
+    })
+  );
 
-          setExpenses(expensesArray);
-        } else {
-          setExpenses([]);
-        }
+  dispatch({
+    type: "SET_EXPENSES",
+    payload: expensesArray,
+  });
+} else {
+  dispatch({
+    type: "SET_EXPENSES",
+    payload: [],
+  });
+}
       } catch (error) {
         console.error("Error fetching expenses:", error);
       }
@@ -180,18 +190,15 @@ function Welcome({ onCompleteProfile }) {
         }
 
         // Update screen only after successful response
-        setExpenses((previousExpenses) =>
-          previousExpenses.map((expense) =>
-            expense.id === editingExpenseId
-              ? {
-                  ...expense,
-                  amount: amount,
-                  description: description,
-                  category: category,
-                }
-              : expense
-          )
-        );
+       dispatch({
+  type: "UPDATE_EXPENSE",
+  payload: {
+    id: editingExpenseId,
+    amount: amount,
+    description: description,
+    category: category,
+  },
+});
 
         // Reset edit mode
         setEditingExpenseId(null);
@@ -231,10 +238,10 @@ function Welcome({ onCompleteProfile }) {
         category: category,
       };
 
-      setExpenses((previousExpenses) => [
-        ...previousExpenses,
-        newExpense,
-      ]);
+      dispatch({
+  type: "ADD_EXPENSE",
+  payload: newExpense,
+});
 
       // Clear form
       setAmount("");
@@ -300,11 +307,10 @@ function Welcome({ onCompleteProfile }) {
       }
 
       // Remove from screen only after successful deletion
-      setExpenses((previousExpenses) =>
-        previousExpenses.filter(
-          (expense) => expense.id !== expenseId
-        )
-      );
+      dispatch({
+  type: "DELETE_EXPENSE",
+  payload: expenseId,
+});
 
       // If deleted expense was being edited
       if (editingExpenseId === expenseId) {
@@ -320,6 +326,18 @@ function Welcome({ onCompleteProfile }) {
           "Failed to delete expense."
       );
     }
+  };
+
+  const incrementFiveTimes = () => {
+    dispatch({ type: "increment" });
+    dispatch({ type: "increment" });
+    dispatch({ type: "increment" });
+    dispatch({ type: "increment" });
+    dispatch({ type: "increment" });
+  };
+
+  const decrementCounter = () => {
+    dispatch({ type: "decrement" });
   };
 
   return (
@@ -500,9 +518,24 @@ function Welcome({ onCompleteProfile }) {
 
         </div>
 
+        {/* Redux Counter */}
+        <div className="redux-counter">
+          <h2>Redux Counter</h2>
+          <h3>Counter: {counter}</h3>
+
+          <button type="button" onClick={incrementFiveTimes}>
+            Increment by 5
+          </button>
+
+          <button type="button" onClick={decrementCounter}>
+            Decrement
+          </button>
+        </div>
+
       </div>
 
     </div>
+
   );
 }
 
