@@ -17,6 +17,7 @@ function Welcome({ onCompleteProfile }) {
   // Redux state
   const expenses = useSelector((state) => state.expenses);
   const counter = useSelector((state) => state.counter);
+  const cartVisible = useSelector((state) => state.cart);
   const token = useSelector((state) => state.auth.token);
   const userId = useSelector((state) => state.auth.userId);
   const theme = useSelector((state) => state.theme);
@@ -432,6 +433,21 @@ function Welcome({ onCompleteProfile }) {
   return (
     <div className={`welcome-page ${theme}`}>
 
+      {/* My Cart */}
+      <button
+        type="button"
+        onClick={() => dispatch({ type: "TOGGLE_CART" })}
+      >
+        My Cart
+      </button>
+
+      {cartVisible && (
+        <div className="cart-box">
+          <h2>My Cart</h2>
+          <p>Your cart is visible.</p>
+        </div>
+      )}
+
       {/* Logout */}
       <button
         className="logout-button"
@@ -703,7 +719,6 @@ function Welcome({ onCompleteProfile }) {
         </div>
 
       </div>
-
     </div>
   );
 }
