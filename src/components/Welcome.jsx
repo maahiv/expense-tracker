@@ -14,20 +14,21 @@ function Welcome({ onCompleteProfile }) {
 
   const dispatch = useDispatch();
 
-  // Redux state
   const expenses = useSelector((state) => state.expenses);
   const counter = useSelector((state) => state.counter);
-  const cartVisible = useSelector((state) => state.cart);
   const token = useSelector((state) => state.auth.token);
   const userId = useSelector((state) => state.auth.userId);
-  const theme = useSelector((state) => state.theme);
+
+  // Cart
+  const cart = useSelector((state) => state.cart);
+  const [cartVisible, setCartVisible] = useState(false);
 
   // Edit state
   const [editingExpenseId, setEditingExpenseId] = useState(null);
 
-  // Total expenses
-  const totalExpense = expenses.reduce(
-    (total, expense) => total + Number(expense.amount || 0),
+  // Total quantity in cart
+  const cartCount = cart.reduce(
+    (total, item) => total + item.quantity,
     0
   );
 
@@ -39,7 +40,10 @@ function Welcome({ onCompleteProfile }) {
       try {
         const idToken = await user.getIdToken(true);
 
-        localStorage.setItem("expenseTrackerToken", idToken);
+        localStorage.setItem(
+          "expenseTrackerToken",
+          idToken
+        );
 
         const response = await fetch(
           `${databaseURL}/expenses/${user.uid}.json?auth=${idToken}`
@@ -152,7 +156,7 @@ function Welcome({ onCompleteProfile }) {
     }
   };
 
-  // Add / Update expense
+  // Add expense
   const handleAddExpense = async (e) => {
     e.preventDefault();
 
@@ -177,7 +181,7 @@ function Welcome({ onCompleteProfile }) {
         category: category,
       };
 
-      // Update existing expense
+      // If editing, update existing expense
       if (editingExpenseId) {
         const response = await fetch(
           `${databaseURL}/expenses/${user.uid}/${editingExpenseId}.json?auth=${idToken}`,
@@ -199,7 +203,6 @@ function Welcome({ onCompleteProfile }) {
           );
         }
 
-        // Update Redux only after successful response
         dispatch({
           type: "UPDATE_EXPENSE",
           payload: {
@@ -210,7 +213,6 @@ function Welcome({ onCompleteProfile }) {
           },
         });
 
-        // Reset edit mode
         setEditingExpenseId(null);
         setAmount("");
         setDescription("");
@@ -219,7 +221,7 @@ function Welcome({ onCompleteProfile }) {
         return;
       }
 
-      // Add new expense
+      // POST new expense
       const response = await fetch(
         `${databaseURL}/expenses/${user.uid}.json?auth=${idToken}`,
         {
@@ -233,7 +235,6 @@ function Welcome({ onCompleteProfile }) {
 
       const data = await response.json();
 
-      // Only show expense after successful response
       if (response.status !== 200) {
         throw new Error(
           data?.error ||
@@ -253,7 +254,6 @@ function Welcome({ onCompleteProfile }) {
         payload: newExpense,
       });
 
-      // Clear form
       setAmount("");
       setDescription("");
       setCategory("Food");
@@ -316,13 +316,11 @@ function Welcome({ onCompleteProfile }) {
         );
       }
 
-      // Remove from Redux only after successful deletion
       dispatch({
         type: "DELETE_EXPENSE",
         payload: expenseId,
       });
 
-      // If deleted expense was being edited
       if (editingExpenseId === expenseId) {
         handleCancelEdit();
       }
@@ -338,70 +336,49 @@ function Welcome({ onCompleteProfile }) {
     }
   };
 
-  // Activate Premium
-  const handleActivatePremium = () => {
+  // =========================
+  // CART FUNCTIONS
+  // =========================
+
+  // Add item to cart
+  const handleAddToCart = (expense) => {
     dispatch({
-      type: "SET_DARK_THEME",
+      type: "ADD_TO_CART",
+      payload: expense,
     });
+
+    setCartVisible(true);
   };
 
-  // Toggle theme
-  const handleToggleTheme = () => {
+  // Increase quantity
+  const handleIncreaseQuantity = (id) => {
     dispatch({
-      type: "TOGGLE_THEME",
+      type: "INCREASE_QUANTITY",
+      payload: id,
     });
   };
 
-  // Download expenses as CSV
-  const handleDownloadCSV = () => {
-    if (expenses.length === 0) {
-      alert("No expenses available to download.");
-      return;
-    }
-
-    const headers = [
-      "Description",
-      "Category",
-      "Amount",
-    ];
-
-    const rows = expenses.map((expense) => [
-      expense.description || "",
-      expense.category || "",
-      expense.amount || 0,
-    ]);
-
-    const csvContent = [
-      headers,
-      ...rows,
-    ]
-      .map((row) =>
-        row
-          .map((value) =>
-            `"${String(value).replace(/"/g, '""')}"`
-          )
-          .join(",")
-      )
-      .join("\n");
-
-    const blob = new Blob([csvContent], {
-      type: "text/csv;charset=utf-8;",
+  // Decrease quantity
+  // Quantity 0 hone par cartReducer automatically remove karega
+  const handleDecreaseQuantity = (id) => {
+    dispatch({
+      type: "DECREASE_QUANTITY",
+      payload: id,
     });
-
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "my-expenses.csv";
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    URL.revokeObjectURL(url);
   };
 
-  // Counter functions
+  // Remove complete item
+  const handleRemoveFromCart = (id) => {
+    dispatch({
+      type: "REMOVE_FROM_CART",
+      payload: id,
+    });
+  };
+
+  // =========================
+  // COUNTER FUNCTIONS
+  // =========================
+
   const incrementFiveTimes = () => {
     dispatch({ type: "increment" });
     dispatch({ type: "increment" });
@@ -431,32 +408,156 @@ function Welcome({ onCompleteProfile }) {
   };
 
   return (
-    <div className={`welcome-page ${theme}`}>
+    <div className="welcome-page">
 
-      {/* My Cart */}
-      <button
-        type="button"
-        onClick={() => dispatch({ type: "TOGGLE_CART" })}
+      {/* =========================
+          TOP BAR
+      ========================= */}
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "20px",
+        }}
       >
-        My Cart
-      </button>
+
+        {/* Cart Icon */}
+        <button
+          type="button"
+          onClick={() => setCartVisible(!cartVisible)}
+          style={{
+            position: "relative",
+            padding: "10px 18px",
+            cursor: "pointer",
+          }}
+        >
+          🛒 Cart
+
+          {cartCount > 0 && (
+            <span
+              style={{
+                marginLeft: "8px",
+                background: "red",
+                color: "white",
+                borderRadius: "50%",
+                padding: "3px 8px",
+                fontSize: "12px",
+              }}
+            >
+              {cartCount}
+            </span>
+          )}
+        </button>
+
+        {/* Logout */}
+        <button
+          className="logout-button"
+          onClick={handleLogout}
+        >
+          Logout
+        </button>
+
+      </div>
+
+      {/* =========================
+          CART
+      ========================= */}
 
       {cartVisible && (
-        <div className="cart-box">
+        <div
+          className="cart-box"
+          style={{
+            border: "1px solid #ccc",
+            padding: "20px",
+            marginBottom: "25px",
+            borderRadius: "10px",
+          }}
+        >
+
           <h2>My Cart</h2>
-          <p>Your cart is visible.</p>
+
+          {cart.length === 0 ? (
+            <p>Your cart is empty.</p>
+          ) : (
+            cart.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  borderBottom: "1px solid #ddd",
+                  padding: "15px 0",
+                  marginBottom: "10px",
+                }}
+              >
+
+                <div>
+                  <strong>
+                    {item.description}
+                  </strong>
+                </div>
+
+                <div>
+                  Category: {item.category}
+                </div>
+
+                <div>
+                  Amount: ₹{item.amount}
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    marginTop: "10px",
+                  }}
+                >
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleDecreaseQuantity(item.id)
+                    }
+                  >
+                    -
+                  </button>
+
+                  <strong>
+                    {item.quantity}
+                  </strong>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleIncreaseQuantity(item.id)
+                    }
+                  >
+                    +
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleRemoveFromCart(item.id)
+                    }
+                  >
+                    Remove
+                  </button>
+
+                </div>
+
+              </div>
+            ))
+          )}
+
         </div>
       )}
 
-      {/* Logout */}
-      <button
-        className="logout-button"
-        onClick={handleLogout}
-      >
-        Logout
-      </button>
+      {/* =========================
+          HEADER
+      ========================= */}
 
-      {/* Header */}
       <div className="welcome-header">
 
         <h1>
@@ -464,6 +565,7 @@ function Welcome({ onCompleteProfile }) {
         </h1>
 
         <div className="profile-message">
+
           <span>
             Your Profile is <b>64%</b> completed.
             A complete Profile has higher chances of
@@ -473,10 +575,13 @@ function Welcome({ onCompleteProfile }) {
           <button onClick={onCompleteProfile}>
             Complete now
           </button>
+
         </div>
 
         {/* Email Verification */}
+
         <div className="email-verification">
+
           <button
             onClick={handleVerifyEmail}
             disabled={sending}
@@ -485,11 +590,15 @@ function Welcome({ onCompleteProfile }) {
               ? "Sending..."
               : "Verify Email ID"}
           </button>
+
         </div>
 
       </div>
 
-      {/* Expense Section */}
+      {/* =========================
+          EXPENSE SECTION
+      ========================= */}
+
       <div className="expense-section">
 
         <h2>
@@ -504,6 +613,7 @@ function Welcome({ onCompleteProfile }) {
         >
 
           {/* Amount */}
+
           <input
             type="number"
             placeholder="Money spent"
@@ -516,6 +626,7 @@ function Welcome({ onCompleteProfile }) {
           />
 
           {/* Description */}
+
           <input
             type="text"
             placeholder="Description"
@@ -526,18 +637,38 @@ function Welcome({ onCompleteProfile }) {
           />
 
           {/* Category */}
+
           <select
             value={category}
             onChange={(e) =>
               setCategory(e.target.value)
             }
           >
-            <option value="Food">Food</option>
-            <option value="Petrol">Petrol</option>
-            <option value="Salary">Salary</option>
-            <option value="Shopping">Shopping</option>
-            <option value="Travel">Travel</option>
-            <option value="Other">Other</option>
+
+            <option value="Food">
+              Food
+            </option>
+
+            <option value="Petrol">
+              Petrol
+            </option>
+
+            <option value="Salary">
+              Salary
+            </option>
+
+            <option value="Shopping">
+              Shopping
+            </option>
+
+            <option value="Travel">
+              Travel
+            </option>
+
+            <option value="Other">
+              Other
+            </option>
+
           </select>
 
           <button
@@ -553,6 +684,7 @@ function Welcome({ onCompleteProfile }) {
           </button>
 
           {/* Cancel Edit */}
+
           {editingExpenseId && (
             <button
               type="button"
@@ -564,49 +696,10 @@ function Welcome({ onCompleteProfile }) {
 
         </form>
 
-        {/* Total Expense */}
-        <div className="total-expense">
-          <h2>
-            Total Expenses: ₹{totalExpense}
-          </h2>
-        </div>
+        {/* =========================
+            EXPENSE LIST
+        ========================= */}
 
-        {/* Premium Section */}
-        {totalExpense > 10000 && (
-          <div className="premium-section">
-
-            <h3>
-              Congratulations! You are now eligible
-              for Premium.
-            </h3>
-
-            <button
-              type="button"
-              onClick={handleActivatePremium}
-            >
-              Activate Premium
-            </button>
-
-            <button
-              type="button"
-              onClick={handleToggleTheme}
-            >
-              {theme === "light"
-                ? "Switch to Dark Mode"
-                : "Switch to Light Mode"}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDownloadCSV}
-            >
-              Download Expenses
-            </button>
-
-          </div>
-        )}
-
-        {/* Expenses List */}
         <div className="expenses-list">
 
           <h2>My Expenses</h2>
@@ -617,12 +710,14 @@ function Welcome({ onCompleteProfile }) {
             </p>
           ) : (
             expenses.map((expense) => (
+
               <div
                 className="expense-item"
                 key={expense.id}
               >
 
                 <div>
+
                   <strong>
                     ₹{expense.amount}
                   </strong>
@@ -630,13 +725,15 @@ function Welcome({ onCompleteProfile }) {
                   <span>
                     {expense.description}
                   </span>
+
                 </div>
 
                 <span className="expense-category">
                   {expense.category}
                 </span>
 
-                {/* Edit / Delete buttons */}
+                {/* Expense Actions */}
+
                 <div className="expense-actions">
 
                   <button
@@ -657,15 +754,30 @@ function Welcome({ onCompleteProfile }) {
                     Delete
                   </button>
 
+                  {/* Add To Cart */}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleAddToCart(expense)
+                    }
+                  >
+                    Add to Cart
+                  </button>
+
                 </div>
 
               </div>
+
             ))
           )}
 
         </div>
 
-        {/* Redux Counter */}
+        {/* =========================
+            REDUX COUNTER
+        ========================= */}
+
         <div className="redux-counter">
 
           <h2>Redux Counter</h2>
@@ -719,6 +831,7 @@ function Welcome({ onCompleteProfile }) {
         </div>
 
       </div>
+
     </div>
   );
 }
