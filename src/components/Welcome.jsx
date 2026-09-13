@@ -2,7 +2,7 @@ import { signOut, onAuthStateChanged } from "firebase/auth";
 import { auth, databaseURL } from "../firebase";
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { logout } from "../redux/authSlice";
+import { login, logout } from "../redux/authSlice";
 
 function Welcome({ onCompleteProfile }) {
   const [sending, setSending] = useState(false);
@@ -11,10 +11,14 @@ function Welcome({ onCompleteProfile }) {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Food");
- const dispatch = useDispatch();
 
-const expenses = useSelector((state) => state.expenses);
+  const dispatch = useDispatch();
+
+  // Redux states
+  const expenses = useSelector((state) => state.expenses);
   const counter = useSelector((state) => state.counter);
+  const token = useSelector((state) => state.auth.token);
+  const userId = useSelector((state) => state.auth.userId);
 
   // Edit state
   const [editingExpenseId, setEditingExpenseId] = useState(null);
@@ -27,10 +31,16 @@ const expenses = useSelector((state) => state.expenses);
       try {
         const idToken = await user.getIdToken(true);
 
-        localStorage.setItem(
-          "expenseTrackerToken",
-          idToken
+        // Save authenticated user details in Redux
+        dispatch(
+          login({
+            token: idToken,
+            userId: user.uid,
+          })
         );
+
+        localStorage.setItem("expenseTrackerToken", idToken);
+        localStorage.setItem("expenseTrackerUserId", user.uid);
 
         const response = await fetch(
           `${databaseURL}/expenses/${user.uid}.json?auth=${idToken}`
@@ -42,26 +52,26 @@ const expenses = useSelector((state) => state.expenses);
 
         const data = await response.json();
 
-       if (data) {
-  const expensesArray = Object.entries(data).map(
-    ([id, expense]) => ({
-      id,
-      amount: expense.amount,
-      description: expense.description,
-      category: expense.category,
-    })
-  );
+        if (data) {
+          const expensesArray = Object.entries(data).map(
+            ([id, expense]) => ({
+              id,
+              amount: expense.amount,
+              description: expense.description,
+              category: expense.category,
+            })
+          );
 
-  dispatch({
-    type: "SET_EXPENSES",
-    payload: expensesArray,
-  });
-} else {
-  dispatch({
-    type: "SET_EXPENSES",
-    payload: [],
-  });
-}
+          dispatch({
+            type: "SET_EXPENSES",
+            payload: expensesArray,
+          });
+        } else {
+          dispatch({
+            type: "SET_EXPENSES",
+            payload: [],
+          });
+        }
       } catch (error) {
         console.error("Error fetching expenses:", error);
       }
@@ -78,17 +88,16 @@ const expenses = useSelector((state) => state.expenses);
         unsubscribe();
       }
     };
-  }, []);
+  }, [dispatch]);
 
   // Logout
   const handleLogout = async () => {
-  try {
-    await signOut(auth);
-  } finally {
-    localStorage.removeItem("expenseTrackerToken");
-    dispatch(logout());
-  }
-};
+    try {
+      await signOut(auth);
+    } finally {
+      dispatch(logout());
+    }
+  };
 
   // Verify Email
   const handleVerifyEmail = async () => {
@@ -143,7 +152,7 @@ const expenses = useSelector((state) => state.expenses);
     }
   };
 
-  // Add expense
+  // Add / Update expense
   const handleAddExpense = async (e) => {
     e.preventDefault();
 
@@ -160,7 +169,8 @@ const expenses = useSelector((state) => state.expenses);
         return;
       }
 
-      const idToken = await user.getIdToken(true);
+      // Use Redux token for API calls
+      const idToken = token || (await user.getIdToken(true));
 
       const expenseData = {
         amount: amount,
@@ -168,7 +178,7 @@ const expenses = useSelector((state) => state.expenses);
         category: category,
       };
 
-      // If editing, update existing expense
+      // Update existing expense
       if (editingExpenseId) {
         const response = await fetch(
           `${databaseURL}/expenses/${user.uid}/${editingExpenseId}.json?auth=${idToken}`,
@@ -190,18 +200,17 @@ const expenses = useSelector((state) => state.expenses);
           );
         }
 
-        // Update screen only after successful response
-       dispatch({
-  type: "UPDATE_EXPENSE",
-  payload: {
-    id: editingExpenseId,
-    amount: amount,
-    description: description,
-    category: category,
-  },
-});
+        // Update Redux only after successful API response
+        dispatch({
+          type: "UPDATE_EXPENSE",
+          payload: {
+            id: editingExpenseId,
+            amount: amount,
+            description: description,
+            category: category,
+          },
+        });
 
-        // Reset edit mode
         setEditingExpenseId(null);
         setAmount("");
         setDescription("");
@@ -210,7 +219,7 @@ const expenses = useSelector((state) => state.expenses);
         return;
       }
 
-      // POST new expense
+      // Add new expense
       const response = await fetch(
         `${databaseURL}/expenses/${user.uid}.json?auth=${idToken}`,
         {
@@ -224,7 +233,7 @@ const expenses = useSelector((state) => state.expenses);
 
       const data = await response.json();
 
-      // Only show expense after 200 Success
+      // Only add to Redux after successful response
       if (response.status !== 200) {
         throw new Error(
           data?.error ||
@@ -240,9 +249,9 @@ const expenses = useSelector((state) => state.expenses);
       };
 
       dispatch({
-  type: "ADD_EXPENSE",
-  payload: newExpense,
-});
+        type: "ADD_EXPENSE",
+        payload: newExpense,
+      });
 
       // Clear form
       setAmount("");
@@ -289,7 +298,8 @@ const expenses = useSelector((state) => state.expenses);
         return;
       }
 
-      const idToken = await user.getIdToken(true);
+      // Use Redux token for API call
+      const idToken = token || (await user.getIdToken(true));
 
       const response = await fetch(
         `${databaseURL}/expenses/${user.uid}/${expenseId}.json?auth=${idToken}`,
@@ -307,20 +317,23 @@ const expenses = useSelector((state) => state.expenses);
         );
       }
 
-      // Remove from screen only after successful deletion
+      // Remove from Redux only after successful deletion
       dispatch({
-  type: "DELETE_EXPENSE",
-  payload: expenseId,
-});
+        type: "DELETE_EXPENSE",
+        payload: expenseId,
+      });
 
       // If deleted expense was being edited
       if (editingExpenseId === expenseId) {
         handleCancelEdit();
       }
 
-      console.log("Expense successfuly deleted");
+      console.log("Expense successfully deleted");
     } catch (error) {
-      console.error("Error deleting expense:", error);
+      console.error(
+        "Error deleting expense:",
+        error
+      );
 
       alert(
         error.message ||
@@ -329,6 +342,7 @@ const expenses = useSelector((state) => state.expenses);
     }
   };
 
+  // Counter
   const incrementFiveTimes = () => {
     dispatch({ type: "increment" });
     dispatch({ type: "increment" });
@@ -350,12 +364,19 @@ const expenses = useSelector((state) => state.expenses);
   };
 
   const incrementBy5 = () => {
-  dispatch({ type: "INCREMENTBY5" });
-};
+    dispatch({ type: "INCREMENTBY5" });
+  };
 
-const decrementBy5 = () => {
-  dispatch({ type: "DECREMENTBY5" });
-};
+  const decrementBy5 = () => {
+    dispatch({ type: "DECREMENTBY5" });
+  };
+
+  // Total expenses
+  const totalExpense = expenses.reduce(
+    (total, expense) =>
+      total + Number(expense.amount || 0),
+    0
+  );
 
   return (
     <div className="welcome-page">
@@ -370,7 +391,6 @@ const decrementBy5 = () => {
 
       {/* Header */}
       <div className="welcome-header">
-
         <h1>
           Welcome to Expense Tracker!!!
         </h1>
@@ -398,7 +418,6 @@ const decrementBy5 = () => {
               : "Verify Email ID"}
           </button>
         </div>
-
       </div>
 
       {/* Expense Section */}
@@ -476,6 +495,29 @@ const decrementBy5 = () => {
 
         </form>
 
+        {/* Total Expense */}
+        <div className="total-expense">
+          <h2>
+            Total Expense: ₹{totalExpense}
+          </h2>
+        </div>
+
+        {/* Premium Button */}
+        {totalExpense > 10000 && (
+          <div className="premium-section">
+            <h3>Premium Feature</h3>
+
+            <p>
+              Your total expenses are above
+              ₹10,000.
+            </p>
+
+            <button type="button">
+              Activate Premium
+            </button>
+          </div>
+        )}
+
         {/* Expenses List */}
         <div className="expenses-list">
 
@@ -521,7 +563,9 @@ const decrementBy5 = () => {
                   <button
                     type="button"
                     onClick={() =>
-                      handleDeleteExpense(expense.id)
+                      handleDeleteExpense(
+                        expense.id
+                      )
                     }
                   >
                     Delete
@@ -537,37 +581,60 @@ const decrementBy5 = () => {
 
         {/* Redux Counter */}
         <div className="redux-counter">
-          <h2>Redux Counter</h2>
-          <h3>Counter: {counter}</h3>
 
-          <button type="button" onClick={incrementFiveTimes}>
+          <h2>Redux Counter</h2>
+
+          <h3>
+            Counter: {counter}
+          </h3>
+
+          <button
+            type="button"
+            onClick={incrementFiveTimes}
+          >
             Increment by 5
           </button>
 
-          <button type="button" onClick={decrementCounter}>
+          <button
+            type="button"
+            onClick={decrementCounter}
+          >
             Decrement
           </button>
 
-          <button type="button" onClick={incrementBy2}>
+          <button
+            type="button"
+            onClick={incrementBy2}
+          >
             Increment by 2
           </button>
 
-          <button type="button" onClick={decrementBy2}>
+          <button
+            type="button"
+            onClick={decrementBy2}
+          >
             Decrement by 2
           </button>
-          <button type="button" onClick={incrementBy5}>
-  IncrementBy5
-</button>
 
-<button type="button" onClick={decrementBy5}>
-  DecrementBy5
-</button>
+          <button
+            type="button"
+            onClick={incrementBy5}
+          >
+            IncrementBy5
+          </button>
+
+          <button
+            type="button"
+            onClick={decrementBy5}
+          >
+            DecrementBy5
+          </button>
+
         </div>
 
       </div>
 
     </div>
-
   );
 }
 
