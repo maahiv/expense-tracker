@@ -2,6 +2,7 @@ import { signOut, onAuthStateChanged } from "firebase/auth";
 import { auth, databaseURL } from "../firebase";
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { logout } from "../redux/authSlice";
 
 function Welcome({ onCompleteProfile }) {
   const [sending, setSending] = useState(false);
@@ -81,13 +82,13 @@ const expenses = useSelector((state) => state.expenses);
 
   // Logout
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } finally {
-      localStorage.removeItem("expenseTrackerToken");
-      window.location.reload();
-    }
-  };
+  try {
+    await signOut(auth);
+  } finally {
+    localStorage.removeItem("expenseTrackerToken");
+    dispatch(logout());
+  }
+};
 
   // Verify Email
   const handleVerifyEmail = async () => {

@@ -1,117 +1,61 @@
 import React, { useState } from "react";
-import {
-  signInWithEmailAndPassword,
-  getIdToken
-} from "firebase/auth";
-import { auth } from "../firebase";
+import { useDispatch } from "react-redux";
+import { login } from "../redux/authSlice";
 
-function Login({
-  onSignup,
-  onLoginSuccess,
-  onForgotPassword
-}) {
+export default function Login({ onSignup }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
+  const dispatch = useDispatch();
+
+  const handleLogin = (e) => {
     e.preventDefault();
 
-    if (!email.trim() || !password) {
-      alert("Please enter both email and password.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password
-      );
-
-      const token = await getIdToken(userCredential.user);
-
-      localStorage.setItem("expenseTrackerToken", token);
-
-      onLoginSuccess();
-    } catch (error) {
-      console.log(error);
-
-      if (
-        error.code === "auth/invalid-credential" ||
-        error.code === "auth/wrong-password" ||
-        error.code === "auth/user-not-found"
-      ) {
-        alert("Invalid email or password. Please try again.");
-      } else if (error.code === "auth/invalid-email") {
-        alert("Please enter a valid email address.");
-      } else if (error.code === "auth/network-request-failed") {
-        alert("Network error. Please check your internet connection.");
-      } else {
-        alert("Something went wrong. Please try again.");
-      }
-    } finally {
-      setLoading(false);
-    }
+    // Login form ki values matter nahi karti
+    dispatch(login());
   };
 
   return (
-    <div className="page login-screen">
+    <div className="auth-page">
+      <div className="card">
+        <h1>Login</h1>
 
-      <div className="blue-shape"></div>
+        <form onSubmit={handleLogin}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
 
-      <main className="auth-content">
-        <div className="auth-card">
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
-          <h1>Login</h1>
+          <button type="submit">
+            Login
+          </button>
 
-          <form onSubmit={handleLogin}>
+          <a
+            className="forgot-password"
+            href="#"
+            onClick={(e) => e.preventDefault()}
+          >
+            Forgot password
+          </a>
+        </form>
+      </div>
 
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-
-            <input
-              type="password"
-              placeholder="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-
-            <button
-              type="submit"
-              disabled={!email.trim() || !password || loading}
-            >
-              {loading ? "Logging in..." : "Login"}
-            </button>
-
-          </form>
-
-        <button
-  type="button"
-  className="forgot-password"
-  onClick={onForgotPassword}
->
-  Forgot password
-</button>
-
-        </div>
-
-        <button
-          className="switch-button"
-          onClick={onSignup}
-        >
-          Don't have an account? Sign up
-        </button>
-
-      </main>
+      <button
+        className="login-box"
+        type="button"
+        onClick={onSignup}
+      >
+        Don't have an account? Sign up
+      </button>
     </div>
   );
 }
-
-export default Login;

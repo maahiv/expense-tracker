@@ -1,33 +1,19 @@
 import React, { useState } from "react";
+import { useSelector } from "react-redux";
+
 import Login from "./components/Login";
 import Signup from "./components/Signup";
 import Welcome from "./components/Welcome";
-import Profile from "./components/Profile";
-import ForgotPassword from "./components/ForgotPassword";
 
 function App() {
-  const [screen, setScreen] = useState(
-    localStorage.getItem("expenseTrackerToken")
-      ? "welcome"
-      : "login"
+  const [screen, setScreen] = useState("login");
+
+  const isAuthenticated = useSelector(
+    (state) => state.auth.isAuthenticated
   );
 
-  if (screen === "forgot-password") {
-  return (
-    <ForgotPassword
-      onBackToLogin={() => setScreen("login")}
-    />
-  );
-}
-
-  if (screen === "login") {
-    return (
-      <Login
-  onSignup={() => setScreen("signup")}
-  onLoginSuccess={() => setScreen("welcome")}
-  onForgotPassword={() => setScreen("forgot-password")}
-/>
-    );
+  if (isAuthenticated) {
+    return <Welcome />;
   }
 
   if (screen === "signup") {
@@ -38,18 +24,9 @@ function App() {
     );
   }
 
-  if (screen === "profile") {
-    return (
-      <Profile
-        onCancel={() => setScreen("welcome")}
-        onUpdated={() => setScreen("welcome")}
-      />
-    );
-  }
-
   return (
-    <Welcome
-      onCompleteProfile={() => setScreen("profile")}
+    <Login
+      onSignup={() => setScreen("signup")}
     />
   );
 }
