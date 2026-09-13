@@ -3,6 +3,10 @@ import { auth, databaseURL } from "../firebase";
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/authSlice";
+import {
+  fetchCart,
+  saveCart,
+} from "../redux/cartReducer";
 
 function Welcome({ onCompleteProfile }) {
   const [sending, setSending] = useState(false);
@@ -21,7 +25,9 @@ function Welcome({ onCompleteProfile }) {
     setApiMessage(message);
   };
 
-  const apiRequestError = (message = "Something went wrong. Please try again.") => {
+  const apiRequestError = (
+    message = "Something went wrong. Please try again."
+  ) => {
     setApiStatus("error");
     setApiMessage(message);
   };
@@ -40,11 +46,8 @@ function Welcome({ onCompleteProfile }) {
 
   const expenses = useSelector((state) => state.expenses);
   const counter = useSelector((state) => state.counter);
-  const token = useSelector((state) => state.auth.token);
-  const userId = useSelector((state) => state.auth.userId);
-
-  // Cart
   const cart = useSelector((state) => state.cart);
+
   const [cartVisible, setCartVisible] = useState(false);
 
   // Edit state
@@ -56,19 +59,29 @@ function Welcome({ onCompleteProfile }) {
     0
   );
 
-  // Get expenses from Firebase when page loads
+  // =====================================================
+  // LOAD EXPENSES + CART FROM FIREBASE ON PAGE LOAD
+  // =====================================================
+
   useEffect(() => {
     let unsubscribe;
 
-    const loadExpenses = async (user) => {
+    const loadExpensesAndCart = async (user) => {
       try {
-        startApiRequest("Loading your expenses...");
+        startApiRequest(
+          "Sending request and loading your data..."
+        );
+
         const idToken = await user.getIdToken(true);
 
         localStorage.setItem(
           "expenseTrackerToken",
           idToken
         );
+
+        // -------------------------
+        // Get Expenses
+        // -------------------------
 
         const response = await fetch(
           `${databaseURL}/expenses/${user.uid}.json?auth=${idToken}`
@@ -101,19 +114,33 @@ function Welcome({ onCompleteProfile }) {
           });
         }
 
-        apiRequestSuccess("Expenses loaded successfully!");
+        // -------------------------
+        // Get Cart using Thunk
+        // -------------------------
+
+        await dispatch(fetchCart()).unwrap();
+
+        apiRequestSuccess(
+          "Expenses and cart loaded successfully!"
+        );
+
         setTimeout(closeApiStatus, 1200);
       } catch (error) {
-        console.error("Error fetching expenses:", error);
+        console.error(
+          "Error loading expenses/cart:",
+          error
+        );
+
         apiRequestError(
-          error.message || "Failed to load expenses. Please try again."
+          error.message ||
+            "Failed to load your data. Please try again."
         );
       }
     };
 
     unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        loadExpenses(user);
+        loadExpensesAndCart(user);
       }
     });
 
@@ -124,7 +151,10 @@ function Welcome({ onCompleteProfile }) {
     };
   }, [dispatch]);
 
-  // Logout
+  // =====================================================
+  // LOGOUT
+  // =====================================================
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -134,17 +164,22 @@ function Welcome({ onCompleteProfile }) {
     }
   };
 
-  // Verify Email
+  // =====================================================
+  // VERIFY EMAIL
+  // =====================================================
+
   const handleVerifyEmail = async () => {
     try {
       setSending(true);
-      startApiRequest("Sending verification email...");
+
+      startApiRequest(
+        "Sending verification email..."
+      );
 
       const user = auth.currentUser;
 
       if (!user) {
-        alert("Please login again.");
-        return;
+        throw new Error("Please login again.");
       }
 
       const idToken = await user.getIdToken(true);
@@ -176,7 +211,11 @@ function Welcome({ onCompleteProfile }) {
       alert(
         "Check your email. A verification link has been sent."
       );
-      apiRequestSuccess("Verification email sent successfully!");
+
+      apiRequestSuccess(
+        "Verification email sent successfully!"
+      );
+
       setTimeout(closeApiStatus, 1200);
     } catch (error) {
       console.error(error);
@@ -193,7 +232,10 @@ function Welcome({ onCompleteProfile }) {
     }
   };
 
-  // Add expense
+  // =====================================================
+  // ADD / UPDATE EXPENSE
+  // =====================================================
+
   const handleAddExpense = async (e) => {
     e.preventDefault();
 
@@ -212,8 +254,7 @@ function Welcome({ onCompleteProfile }) {
       const user = auth.currentUser;
 
       if (!user) {
-        alert("Please login again.");
-        return;
+        throw new Error("Please login again.");
       }
 
       const idToken = await user.getIdToken(true);
@@ -224,7 +265,10 @@ function Welcome({ onCompleteProfile }) {
         category: category,
       };
 
-      // If editing, update existing expense
+      // -------------------------
+      // Update existing expense
+      // -------------------------
+
       if (editingExpenseId) {
         const response = await fetch(
           `${databaseURL}/expenses/${user.uid}/${editingExpenseId}.json?auth=${idToken}`,
@@ -261,13 +305,19 @@ function Welcome({ onCompleteProfile }) {
         setDescription("");
         setCategory("Food");
 
-        apiRequestSuccess("Expense updated successfully!");
+        apiRequestSuccess(
+          "Expense updated successfully!"
+        );
+
         setTimeout(closeApiStatus, 1200);
 
         return;
       }
 
-      // POST new expense
+      // -------------------------
+      // Add new expense
+      // -------------------------
+
       const response = await fetch(
         `${databaseURL}/expenses/${user.uid}.json?auth=${idToken}`,
         {
@@ -304,10 +354,16 @@ function Welcome({ onCompleteProfile }) {
       setDescription("");
       setCategory("Food");
 
-      apiRequestSuccess("Expense added successfully!");
+      apiRequestSuccess(
+        "Expense added successfully!"
+      );
+
       setTimeout(closeApiStatus, 1200);
     } catch (error) {
-      console.error("Error saving expense:", error);
+      console.error(
+        "Error saving expense:",
+        error
+      );
 
       const message =
         error.message ||
@@ -319,7 +375,10 @@ function Welcome({ onCompleteProfile }) {
     }
   };
 
-  // Edit expense
+  // =====================================================
+  // EDIT EXPENSE
+  // =====================================================
+
   const handleEditExpense = (expense) => {
     setEditingExpenseId(expense.id);
     setAmount(expense.amount);
@@ -332,7 +391,10 @@ function Welcome({ onCompleteProfile }) {
     });
   };
 
-  // Cancel edit
+  // =====================================================
+  // CANCEL EDIT
+  // =====================================================
+
   const handleCancelEdit = () => {
     setEditingExpenseId(null);
     setAmount("");
@@ -340,7 +402,10 @@ function Welcome({ onCompleteProfile }) {
     setCategory("Food");
   };
 
-  // Delete expense
+  // =====================================================
+  // DELETE EXPENSE
+  // =====================================================
+
   const handleDeleteExpense = async (expenseId) => {
     try {
       startApiRequest("Deleting expense...");
@@ -348,8 +413,7 @@ function Welcome({ onCompleteProfile }) {
       const user = auth.currentUser;
 
       if (!user) {
-        alert("Please login again.");
-        return;
+        throw new Error("Please login again.");
       }
 
       const idToken = await user.getIdToken(true);
@@ -379,12 +443,16 @@ function Welcome({ onCompleteProfile }) {
         handleCancelEdit();
       }
 
-      console.log("Expense successfully deleted");
+      apiRequestSuccess(
+        "Expense deleted successfully!"
+      );
 
-      apiRequestSuccess("Expense deleted successfully!");
       setTimeout(closeApiStatus, 1200);
     } catch (error) {
-      console.error("Error deleting expense:", error);
+      console.error(
+        "Error deleting expense:",
+        error
+      );
 
       const message =
         error.message ||
@@ -396,48 +464,183 @@ function Welcome({ onCompleteProfile }) {
     }
   };
 
-  // =========================
+  // =====================================================
   // CART FUNCTIONS
-  // =========================
+  // =====================================================
 
-  // Add item to cart
-  const handleAddToCart = (expense) => {
-    dispatch({
-      type: "ADD_TO_CART",
-      payload: expense,
-    });
+  // Add item to cart and save it to Firebase
+  const handleAddToCart = async (expense) => {
+    try {
+      startApiRequest("Adding item to cart...");
 
-    setCartVisible(true);
+      const nextCart = [...cart];
+
+      const existingIndex = nextCart.findIndex(
+        (item) => item.id === expense.id
+      );
+
+      if (existingIndex !== -1) {
+        nextCart[existingIndex] = {
+          ...nextCart[existingIndex],
+          quantity:
+            nextCart[existingIndex].quantity + 1,
+        };
+      } else {
+        nextCart.push({
+          ...expense,
+          quantity: 1,
+        });
+      }
+
+      // Save updated cart using thunk
+      await dispatch(saveCart(nextCart)).unwrap();
+
+      // Update Redux after successful Firebase save
+      dispatch({
+        type: "SET_CART",
+        payload: nextCart,
+      });
+
+      setCartVisible(true);
+
+      apiRequestSuccess(
+        "Item added to cart successfully!"
+      );
+
+      setTimeout(closeApiStatus, 1200);
+    } catch (error) {
+      console.error(
+        "Error adding item to cart:",
+        error
+      );
+
+      apiRequestError(
+        error.message ||
+          "Failed to add item to cart."
+      );
+    }
   };
 
-  // Increase quantity
-  const handleIncreaseQuantity = (id) => {
-    dispatch({
-      type: "INCREASE_QUANTITY",
-      payload: id,
-    });
+  // Increase quantity and save to Firebase
+  const handleIncreaseQuantity = async (id) => {
+    try {
+      startApiRequest("Updating cart...");
+
+      const nextCart = cart.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              quantity: item.quantity + 1,
+            }
+          : item
+      );
+
+      await dispatch(saveCart(nextCart)).unwrap();
+
+      dispatch({
+        type: "SET_CART",
+        payload: nextCart,
+      });
+
+      apiRequestSuccess(
+        "Cart updated successfully!"
+      );
+
+      setTimeout(closeApiStatus, 1000);
+    } catch (error) {
+      console.error(
+        "Error updating cart:",
+        error
+      );
+
+      apiRequestError(
+        error.message ||
+          "Failed to update cart."
+      );
+    }
   };
 
-  // Decrease quantity
-  // Quantity 0 hone par cartReducer automatically remove karega
-  const handleDecreaseQuantity = (id) => {
-    dispatch({
-      type: "DECREASE_QUANTITY",
-      payload: id,
-    });
+  // Decrease quantity and save to Firebase
+  // Quantity 0 hone par item remove ho jayega
+  const handleDecreaseQuantity = async (id) => {
+    try {
+      startApiRequest("Updating cart...");
+
+      const nextCart = cart
+        .map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                quantity: item.quantity - 1,
+              }
+            : item
+        )
+        .filter((item) => item.quantity > 0);
+
+      await dispatch(saveCart(nextCart)).unwrap();
+
+      dispatch({
+        type: "SET_CART",
+        payload: nextCart,
+      });
+
+      apiRequestSuccess(
+        "Cart updated successfully!"
+      );
+
+      setTimeout(closeApiStatus, 1000);
+    } catch (error) {
+      console.error(
+        "Error updating cart:",
+        error
+      );
+
+      apiRequestError(
+        error.message ||
+          "Failed to update cart."
+      );
+    }
   };
 
   // Remove complete item
-  const handleRemoveFromCart = (id) => {
-    dispatch({
-      type: "REMOVE_FROM_CART",
-      payload: id,
-    });
+  const handleRemoveFromCart = async (id) => {
+    try {
+      startApiRequest(
+        "Removing item from cart..."
+      );
+
+      const nextCart = cart.filter(
+        (item) => item.id !== id
+      );
+
+      await dispatch(saveCart(nextCart)).unwrap();
+
+      dispatch({
+        type: "SET_CART",
+        payload: nextCart,
+      });
+
+      apiRequestSuccess(
+        "Item removed from cart successfully!"
+      );
+
+      setTimeout(closeApiStatus, 1000);
+    } catch (error) {
+      console.error(
+        "Error removing cart item:",
+        error
+      );
+
+      apiRequestError(
+        error.message ||
+          "Failed to remove item from cart."
+      );
+    }
   };
 
-  // =========================
+  // =====================================================
   // COUNTER FUNCTIONS
-  // =========================
+  // =====================================================
 
   const incrementFiveTimes = () => {
     dispatch({ type: "increment" });
@@ -470,9 +673,62 @@ function Welcome({ onCompleteProfile }) {
   return (
     <div className="welcome-page">
 
-      {/* =========================
+      {/* =====================================================
+          API STATUS NOTIFICATION
+      ===================================================== */}
+
+      {apiStatus !== "idle" && (
+        <div
+          style={{
+            position: "fixed",
+            top: "20px",
+            right: "20px",
+            zIndex: 9999,
+            minWidth: "280px",
+            padding: "18px",
+            borderRadius: "10px",
+            backgroundColor:
+              apiStatus === "loading"
+                ? "#fff3cd"
+                : apiStatus === "success"
+                ? "#d4edda"
+                : "#f8d7da",
+            border:
+              apiStatus === "loading"
+                ? "1px solid #ffeeba"
+                : apiStatus === "success"
+                ? "1px solid #c3e6cb"
+                : "1px solid #f5c6cb",
+            boxShadow:
+              "0 4px 12px rgba(0,0,0,0.15)",
+          }}
+        >
+          <strong>
+            {apiStatus === "loading"
+              ? "Sending Data..."
+              : apiStatus === "success"
+              ? "Success"
+              : "Error"}
+          </strong>
+
+          <p style={{ margin: "8px 0" }}>
+            {apiMessage}
+          </p>
+
+          {apiStatus === "error" && (
+            <button
+              type="button"
+              onClick={closeApiStatus}
+            >
+              Close
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* =====================================================
           TOP BAR
-      ========================= */}
+      ===================================================== */}
 
       <div
         style={{
@@ -484,9 +740,12 @@ function Welcome({ onCompleteProfile }) {
       >
 
         {/* Cart Icon */}
+
         <button
           type="button"
-          onClick={() => setCartVisible(!cartVisible)}
+          onClick={() =>
+            setCartVisible(!cartVisible)
+          }
           style={{
             position: "relative",
             padding: "10px 18px",
@@ -512,18 +771,18 @@ function Welcome({ onCompleteProfile }) {
         </button>
 
         {/* Logout */}
+
         <button
           className="logout-button"
           onClick={handleLogout}
         >
           Logout
         </button>
-
       </div>
 
-      {/* =========================
+      {/* =====================================================
           CART
-      ========================= */}
+      ===================================================== */}
 
       {cartVisible && (
         <div
@@ -535,7 +794,6 @@ function Welcome({ onCompleteProfile }) {
             borderRadius: "10px",
           }}
         >
-
           <h2>My Cart</h2>
 
           {cart.length === 0 ? (
@@ -545,12 +803,12 @@ function Welcome({ onCompleteProfile }) {
               <div
                 key={item.id}
                 style={{
-                  borderBottom: "1px solid #ddd",
+                  borderBottom:
+                    "1px solid #ddd",
                   padding: "15px 0",
                   marginBottom: "10px",
                 }}
               >
-
                 <div>
                   <strong>
                     {item.description}
@@ -573,11 +831,12 @@ function Welcome({ onCompleteProfile }) {
                     marginTop: "10px",
                   }}
                 >
-
                   <button
                     type="button"
                     onClick={() =>
-                      handleDecreaseQuantity(item.id)
+                      handleDecreaseQuantity(
+                        item.id
+                      )
                     }
                   >
                     -
@@ -590,7 +849,9 @@ function Welcome({ onCompleteProfile }) {
                   <button
                     type="button"
                     onClick={() =>
-                      handleIncreaseQuantity(item.id)
+                      handleIncreaseQuantity(
+                        item.id
+                      )
                     }
                   >
                     +
@@ -599,24 +860,23 @@ function Welcome({ onCompleteProfile }) {
                   <button
                     type="button"
                     onClick={() =>
-                      handleRemoveFromCart(item.id)
+                      handleRemoveFromCart(
+                        item.id
+                      )
                     }
                   >
                     Remove
                   </button>
-
                 </div>
-
               </div>
             ))
           )}
-
         </div>
       )}
 
-      {/* =========================
+      {/* =====================================================
           HEADER
-      ========================= */}
+      ===================================================== */}
 
       <div className="welcome-header">
 
@@ -625,23 +885,20 @@ function Welcome({ onCompleteProfile }) {
         </h1>
 
         <div className="profile-message">
-
           <span>
             Your Profile is <b>64%</b> completed.
-            A complete Profile has higher chances of
-            landing a job.
+            A complete Profile has higher chances
+            of landing a job.
           </span>
 
           <button onClick={onCompleteProfile}>
             Complete now
           </button>
-
         </div>
 
         {/* Email Verification */}
 
         <div className="email-verification">
-
           <button
             onClick={handleVerifyEmail}
             disabled={sending}
@@ -650,14 +907,12 @@ function Welcome({ onCompleteProfile }) {
               ? "Sending..."
               : "Verify Email ID"}
           </button>
-
         </div>
-
       </div>
 
-      {/* =========================
+      {/* =====================================================
           EXPENSE SECTION
-      ========================= */}
+      ===================================================== */}
 
       <div className="expense-section">
 
@@ -704,7 +959,6 @@ function Welcome({ onCompleteProfile }) {
               setCategory(e.target.value)
             }
           >
-
             <option value="Food">
               Food
             </option>
@@ -728,7 +982,6 @@ function Welcome({ onCompleteProfile }) {
             <option value="Other">
               Other
             </option>
-
           </select>
 
           <button
@@ -753,12 +1006,11 @@ function Welcome({ onCompleteProfile }) {
               Cancel
             </button>
           )}
-
         </form>
 
-        {/* =========================
+        {/* =====================================================
             EXPENSE LIST
-        ========================= */}
+        ===================================================== */}
 
         <div className="expenses-list">
 
@@ -770,14 +1022,11 @@ function Welcome({ onCompleteProfile }) {
             </p>
           ) : (
             expenses.map((expense) => (
-
               <div
                 className="expense-item"
                 key={expense.id}
               >
-
                 <div>
-
                   <strong>
                     ₹{expense.amount}
                   </strong>
@@ -785,7 +1034,6 @@ function Welcome({ onCompleteProfile }) {
                   <span>
                     {expense.description}
                   </span>
-
                 </div>
 
                 <span className="expense-category">
@@ -799,7 +1047,9 @@ function Welcome({ onCompleteProfile }) {
                   <button
                     type="button"
                     onClick={() =>
-                      handleEditExpense(expense)
+                      handleEditExpense(
+                        expense
+                      )
                     }
                   >
                     Edit
@@ -808,7 +1058,9 @@ function Welcome({ onCompleteProfile }) {
                   <button
                     type="button"
                     onClick={() =>
-                      handleDeleteExpense(expense.id)
+                      handleDeleteExpense(
+                        expense.id
+                      )
                     }
                   >
                     Delete
@@ -819,24 +1071,23 @@ function Welcome({ onCompleteProfile }) {
                   <button
                     type="button"
                     onClick={() =>
-                      handleAddToCart(expense)
+                      handleAddToCart(
+                        expense
+                      )
                     }
                   >
                     Add to Cart
                   </button>
 
                 </div>
-
               </div>
-
             ))
           )}
-
         </div>
 
-        {/* =========================
+        {/* =====================================================
             REDUX COUNTER
-        ========================= */}
+        ===================================================== */}
 
         <div className="redux-counter">
 
@@ -889,9 +1140,7 @@ function Welcome({ onCompleteProfile }) {
           </button>
 
         </div>
-
       </div>
-
     </div>
   );
 }
