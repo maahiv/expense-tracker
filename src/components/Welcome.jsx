@@ -2,7 +2,7 @@ import { signOut, onAuthStateChanged } from "firebase/auth";
 import { auth, databaseURL } from "../firebase";
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { login, logout } from "../redux/authSlice";
+import { logout } from "../redux/authSlice";
 
 function Welcome({ onCompleteProfile }) {
   const [sending, setSending] = useState(false);
@@ -14,14 +14,21 @@ function Welcome({ onCompleteProfile }) {
 
   const dispatch = useDispatch();
 
-  // Redux states
+  // Redux state
   const expenses = useSelector((state) => state.expenses);
   const counter = useSelector((state) => state.counter);
   const token = useSelector((state) => state.auth.token);
   const userId = useSelector((state) => state.auth.userId);
+  const theme = useSelector((state) => state.theme);
 
   // Edit state
   const [editingExpenseId, setEditingExpenseId] = useState(null);
+
+  // Total expenses
+  const totalExpense = expenses.reduce(
+    (total, expense) => total + Number(expense.amount || 0),
+    0
+  );
 
   // Get expenses from Firebase when page loads
   useEffect(() => {
@@ -31,16 +38,7 @@ function Welcome({ onCompleteProfile }) {
       try {
         const idToken = await user.getIdToken(true);
 
-        // Save authenticated user details in Redux
-        dispatch(
-          login({
-            token: idToken,
-            userId: user.uid,
-          })
-        );
-
         localStorage.setItem("expenseTrackerToken", idToken);
-        localStorage.setItem("expenseTrackerUserId", user.uid);
 
         const response = await fetch(
           `${databaseURL}/expenses/${user.uid}.json?auth=${idToken}`
@@ -95,6 +93,7 @@ function Welcome({ onCompleteProfile }) {
     try {
       await signOut(auth);
     } finally {
+      localStorage.removeItem("expenseTrackerToken");
       dispatch(logout());
     }
   };
@@ -169,8 +168,7 @@ function Welcome({ onCompleteProfile }) {
         return;
       }
 
-      // Use Redux token for API calls
-      const idToken = token || (await user.getIdToken(true));
+      const idToken = await user.getIdToken(true);
 
       const expenseData = {
         amount: amount,
@@ -200,7 +198,7 @@ function Welcome({ onCompleteProfile }) {
           );
         }
 
-        // Update Redux only after successful API response
+        // Update Redux only after successful response
         dispatch({
           type: "UPDATE_EXPENSE",
           payload: {
@@ -211,6 +209,7 @@ function Welcome({ onCompleteProfile }) {
           },
         });
 
+        // Reset edit mode
         setEditingExpenseId(null);
         setAmount("");
         setDescription("");
@@ -233,7 +232,7 @@ function Welcome({ onCompleteProfile }) {
 
       const data = await response.json();
 
-      // Only add to Redux after successful response
+      // Only show expense after successful response
       if (response.status !== 200) {
         throw new Error(
           data?.error ||
@@ -298,8 +297,7 @@ function Welcome({ onCompleteProfile }) {
         return;
       }
 
-      // Use Redux token for API call
-      const idToken = token || (await user.getIdToken(true));
+      const idToken = await user.getIdToken(true);
 
       const response = await fetch(
         `${databaseURL}/expenses/${user.uid}/${expenseId}.json?auth=${idToken}`,
@@ -330,10 +328,7 @@ function Welcome({ onCompleteProfile }) {
 
       console.log("Expense successfully deleted");
     } catch (error) {
-      console.error(
-        "Error deleting expense:",
-        error
-      );
+      console.error("Error deleting expense:", error);
 
       alert(
         error.message ||
@@ -342,7 +337,70 @@ function Welcome({ onCompleteProfile }) {
     }
   };
 
-  // Counter
+  // Activate Premium
+  const handleActivatePremium = () => {
+    dispatch({
+      type: "SET_DARK_THEME",
+    });
+  };
+
+  // Toggle theme
+  const handleToggleTheme = () => {
+    dispatch({
+      type: "TOGGLE_THEME",
+    });
+  };
+
+  // Download expenses as CSV
+  const handleDownloadCSV = () => {
+    if (expenses.length === 0) {
+      alert("No expenses available to download.");
+      return;
+    }
+
+    const headers = [
+      "Description",
+      "Category",
+      "Amount",
+    ];
+
+    const rows = expenses.map((expense) => [
+      expense.description || "",
+      expense.category || "",
+      expense.amount || 0,
+    ]);
+
+    const csvContent = [
+      headers,
+      ...rows,
+    ]
+      .map((row) =>
+        row
+          .map((value) =>
+            `"${String(value).replace(/"/g, '""')}"`
+          )
+          .join(",")
+      )
+      .join("\n");
+
+    const blob = new Blob([csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "my-expenses.csv";
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+  };
+
+  // Counter functions
   const incrementFiveTimes = () => {
     dispatch({ type: "increment" });
     dispatch({ type: "increment" });
@@ -371,15 +429,8 @@ function Welcome({ onCompleteProfile }) {
     dispatch({ type: "DECREMENTBY5" });
   };
 
-  // Total expenses
-  const totalExpense = expenses.reduce(
-    (total, expense) =>
-      total + Number(expense.amount || 0),
-    0
-  );
-
   return (
-    <div className="welcome-page">
+    <div className={`welcome-page ${theme}`}>
 
       {/* Logout */}
       <button
@@ -391,6 +442,7 @@ function Welcome({ onCompleteProfile }) {
 
       {/* Header */}
       <div className="welcome-header">
+
         <h1>
           Welcome to Expense Tracker!!!
         </h1>
@@ -418,6 +470,7 @@ function Welcome({ onCompleteProfile }) {
               : "Verify Email ID"}
           </button>
         </div>
+
       </div>
 
       {/* Expense Section */}
@@ -498,23 +551,42 @@ function Welcome({ onCompleteProfile }) {
         {/* Total Expense */}
         <div className="total-expense">
           <h2>
-            Total Expense: ₹{totalExpense}
+            Total Expenses: ₹{totalExpense}
           </h2>
         </div>
 
-        {/* Premium Button */}
+        {/* Premium Section */}
         {totalExpense > 10000 && (
           <div className="premium-section">
-            <h3>Premium Feature</h3>
 
-            <p>
-              Your total expenses are above
-              ₹10,000.
-            </p>
+            <h3>
+              Congratulations! You are now eligible
+              for Premium.
+            </h3>
 
-            <button type="button">
+            <button
+              type="button"
+              onClick={handleActivatePremium}
+            >
               Activate Premium
             </button>
+
+            <button
+              type="button"
+              onClick={handleToggleTheme}
+            >
+              {theme === "light"
+                ? "Switch to Dark Mode"
+                : "Switch to Light Mode"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadCSV}
+            >
+              Download Expenses
+            </button>
+
           </div>
         )}
 
@@ -563,9 +635,7 @@ function Welcome({ onCompleteProfile }) {
                   <button
                     type="button"
                     onClick={() =>
-                      handleDeleteExpense(
-                        expense.id
-                      )
+                      handleDeleteExpense(expense.id)
                     }
                   >
                     Delete
