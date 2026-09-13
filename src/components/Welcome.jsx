@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/authSlice";
 import {
   fetchCart,
-  saveCart,
+  sendCartData,
 } from "../redux/cartReducer";
 
 function Welcome({ onCompleteProfile }) {
@@ -20,7 +20,9 @@ function Welcome({ onCompleteProfile }) {
     setApiMessage(message);
   };
 
-  const apiRequestSuccess = (message = "Request successful!") => {
+  const apiRequestSuccess = (
+    message = "Request successful!"
+  ) => {
     setApiStatus("success");
     setApiMessage(message);
   };
@@ -283,7 +285,7 @@ function Welcome({ onCompleteProfile }) {
 
         const data = await response.json();
 
-        if (response.status !== 200) {
+        if (!response.ok) {
           throw new Error(
             data?.error ||
               "Failed to update expense."
@@ -331,7 +333,7 @@ function Welcome({ onCompleteProfile }) {
 
       const data = await response.json();
 
-      if (response.status !== 200) {
+      if (!response.ok) {
         throw new Error(
           data?.error ||
             "Failed to save expense."
@@ -427,7 +429,7 @@ function Welcome({ onCompleteProfile }) {
 
       const data = await response.json();
 
-      if (response.status !== 200) {
+      if (!response.ok) {
         throw new Error(
           data?.error ||
             "Failed to delete expense."
@@ -468,7 +470,7 @@ function Welcome({ onCompleteProfile }) {
   // CART FUNCTIONS
   // =====================================================
 
-  // Add item to cart and save it to Firebase
+  // Add item to cart and send it to Firebase
   const handleAddToCart = async (expense) => {
     try {
       startApiRequest("Adding item to cart...");
@@ -492,8 +494,10 @@ function Welcome({ onCompleteProfile }) {
         });
       }
 
-      // Save updated cart using thunk
-      await dispatch(saveCart(nextCart)).unwrap();
+      // Send cart data using createAsyncThunk
+      await dispatch(
+        sendCartData(nextCart)
+      ).unwrap();
 
       // Update Redux after successful Firebase save
       dispatch({
@@ -515,13 +519,13 @@ function Welcome({ onCompleteProfile }) {
       );
 
       apiRequestError(
-        error.message ||
+        error ||
           "Failed to add item to cart."
       );
     }
   };
 
-  // Increase quantity and save to Firebase
+  // Increase quantity and send to Firebase
   const handleIncreaseQuantity = async (id) => {
     try {
       startApiRequest("Updating cart...");
@@ -535,7 +539,9 @@ function Welcome({ onCompleteProfile }) {
           : item
       );
 
-      await dispatch(saveCart(nextCart)).unwrap();
+      await dispatch(
+        sendCartData(nextCart)
+      ).unwrap();
 
       dispatch({
         type: "SET_CART",
@@ -554,14 +560,13 @@ function Welcome({ onCompleteProfile }) {
       );
 
       apiRequestError(
-        error.message ||
+        error ||
           "Failed to update cart."
       );
     }
   };
 
-  // Decrease quantity and save to Firebase
-  // Quantity 0 hone par item remove ho jayega
+  // Decrease quantity and send to Firebase
   const handleDecreaseQuantity = async (id) => {
     try {
       startApiRequest("Updating cart...");
@@ -577,7 +582,9 @@ function Welcome({ onCompleteProfile }) {
         )
         .filter((item) => item.quantity > 0);
 
-      await dispatch(saveCart(nextCart)).unwrap();
+      await dispatch(
+        sendCartData(nextCart)
+      ).unwrap();
 
       dispatch({
         type: "SET_CART",
@@ -596,7 +603,7 @@ function Welcome({ onCompleteProfile }) {
       );
 
       apiRequestError(
-        error.message ||
+        error ||
           "Failed to update cart."
       );
     }
@@ -613,7 +620,9 @@ function Welcome({ onCompleteProfile }) {
         (item) => item.id !== id
       );
 
-      await dispatch(saveCart(nextCart)).unwrap();
+      await dispatch(
+        sendCartData(nextCart)
+      ).unwrap();
 
       dispatch({
         type: "SET_CART",
@@ -632,7 +641,7 @@ function Welcome({ onCompleteProfile }) {
       );
 
       apiRequestError(
-        error.message ||
+        error ||
           "Failed to remove item from cart."
       );
     }
@@ -738,7 +747,6 @@ function Welcome({ onCompleteProfile }) {
           marginBottom: "20px",
         }}
       >
-
         {/* Cart Icon */}
 
         <button

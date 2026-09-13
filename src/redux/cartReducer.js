@@ -1,4 +1,7 @@
-import { createAsyncThunk } from "@reduxjs/toolkit";
+import {
+  createAsyncThunk,
+  createSlice,
+} from "@reduxjs/toolkit";
 import { auth, databaseURL } from "../firebase";
 
 // Fetch cart data from Firebase when page reloads
@@ -50,9 +53,9 @@ export const fetchCart = createAsyncThunk(
 );
 
 
-// Save cart data to Firebase
-export const saveCart = createAsyncThunk(
-  "cart/saveCart",
+// Send cart data to Firebase using createAsyncThunk
+export const sendCartData = createAsyncThunk(
+  "cart/sendCartData",
   async (cart, { rejectWithValue }) => {
     try {
       const user = auth.currentUser;
@@ -89,30 +92,33 @@ export const saveCart = createAsyncThunk(
 
       if (!response.ok) {
         throw new Error(
-          data?.error || "Failed to save cart."
+          data?.error || "Failed to send cart data."
         );
       }
 
       return cart;
     } catch (error) {
       return rejectWithValue(
-        error.message || "Failed to save cart."
+        error.message || "Failed to send cart data."
       );
     }
   }
 );
 
 
-const cartReducer = (state = [], action) => {
-  switch (action.type) {
+const cartSlice = createSlice({
+  name: "cart",
 
-    // Set cart after getting data from Firebase
-    case "SET_CART":
+  initialState: [],
+
+  reducers: {
+    // Set cart after fetching from Firebase
+    setCart(state, action) {
       return action.payload;
-
+    },
 
     // Add item to cart
-    case "ADD_TO_CART": {
+    addToCart(state, action) {
       const product = action.payload;
 
       const existingProduct = state.find(
@@ -120,63 +126,85 @@ const cartReducer = (state = [], action) => {
       );
 
       if (existingProduct) {
-        return state.map((item) =>
-          item.id === product.id
-            ? {
-                ...item,
-                quantity: item.quantity + 1,
-              }
-            : item
-        );
-      }
-
-      return [
-        ...state,
-        {
+        existingProduct.quantity += 1;
+      } else {
+        state.push({
           ...product,
           quantity: 1,
-        },
-      ];
-    }
-
+        });
+      }
+    },
 
     // Increase quantity
-    case "INCREASE_QUANTITY":
-      return state.map((item) =>
-        item.id === action.payload
-          ? {
-              ...item,
-              quantity: item.quantity + 1,
-            }
-          : item
+    increaseQuantity(state, action) {
+      const item = state.find(
+        (item) => item.id === action.payload
       );
 
+      if (item) {
+        item.quantity += 1;
+      }
+    },
 
     // Decrease quantity
-    // If quantity becomes 0, remove item
-    case "DECREASE_QUANTITY":
-      return state
-        .map((item) =>
-          item.id === action.payload
-            ? {
-                ...item,
-                quantity: item.quantity - 1,
-              }
-            : item
-        )
-        .filter((item) => item.quantity > 0);
+    // Remove item when quantity becomes 0
+    decreaseQuantity(state, action) {
+      const item = state.find(
+        (item) => item.id === action.payload
+      );
 
+      if (item) {
+        item.quantity -= 1;
+      }
+
+      return state.filter(
+        (item) => item.quantity > 0
+      );
+    },
 
     // Remove complete item
-    case "REMOVE_FROM_CART":
+    removeFromCart(state, action) {
       return state.filter(
         (item) => item.id !== action.payload
       );
+    },
+  },
 
 
-    default:
-      return state;
-  }
-};
+  // Handle async thunk states
+  extraReducers: (builder) => {
+    builder
 
-export default cartReducer;
+      // Sending data
+      .addCase(sendCartData.pending, () => {
+        console.log("Sending cart data...");
+      })
+
+      // Data sent successfully
+      .addCase(sendCartData.fulfilled, () => {
+        console.log("Cart data sent successfully.");
+      })
+
+      // Error while sending data
+      .addCase(
+        sendCartData.rejected,
+        (state, action) => {
+          console.error(
+            "Failed to send cart data:",
+            action.payload
+          );
+        }
+      );
+  },
+});
+
+
+export const {
+  setCart,
+  addToCart,
+  increaseQuantity,
+  decreaseQuantity,
+  removeFromCart,
+} = cartSlice.actions;
+
+export default cartSlice.reducer;
