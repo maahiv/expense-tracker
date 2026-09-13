@@ -7,6 +7,30 @@ import { logout } from "../redux/authSlice";
 function Welcome({ onCompleteProfile }) {
   const [sending, setSending] = useState(false);
 
+  // API request status
+  const [apiStatus, setApiStatus] = useState("idle");
+  const [apiMessage, setApiMessage] = useState("");
+
+  const startApiRequest = (message = "Please wait...") => {
+    setApiStatus("loading");
+    setApiMessage(message);
+  };
+
+  const apiRequestSuccess = (message = "Request successful!") => {
+    setApiStatus("success");
+    setApiMessage(message);
+  };
+
+  const apiRequestError = (message = "Something went wrong. Please try again.") => {
+    setApiStatus("error");
+    setApiMessage(message);
+  };
+
+  const closeApiStatus = () => {
+    setApiStatus("idle");
+    setApiMessage("");
+  };
+
   // Expense states
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -38,6 +62,7 @@ function Welcome({ onCompleteProfile }) {
 
     const loadExpenses = async (user) => {
       try {
+        startApiRequest("Loading your expenses...");
         const idToken = await user.getIdToken(true);
 
         localStorage.setItem(
@@ -75,8 +100,14 @@ function Welcome({ onCompleteProfile }) {
             payload: [],
           });
         }
+
+        apiRequestSuccess("Expenses loaded successfully!");
+        setTimeout(closeApiStatus, 1200);
       } catch (error) {
         console.error("Error fetching expenses:", error);
+        apiRequestError(
+          error.message || "Failed to load expenses. Please try again."
+        );
       }
     };
 
@@ -107,6 +138,7 @@ function Welcome({ onCompleteProfile }) {
   const handleVerifyEmail = async () => {
     try {
       setSending(true);
+      startApiRequest("Sending verification email...");
 
       const user = auth.currentUser;
 
@@ -144,13 +176,18 @@ function Welcome({ onCompleteProfile }) {
       alert(
         "Check your email. A verification link has been sent."
       );
+      apiRequestSuccess("Verification email sent successfully!");
+      setTimeout(closeApiStatus, 1200);
     } catch (error) {
       console.error(error);
 
-      alert(
+      const message =
         error.message ||
-          "Unable to send verification email."
-      );
+        "Unable to send verification email.";
+
+      apiRequestError(message);
+
+      alert(message);
     } finally {
       setSending(false);
     }
@@ -166,6 +203,12 @@ function Welcome({ onCompleteProfile }) {
     }
 
     try {
+      startApiRequest(
+        editingExpenseId
+          ? "Updating expense..."
+          : "Adding expense..."
+      );
+
       const user = auth.currentUser;
 
       if (!user) {
@@ -218,6 +261,9 @@ function Welcome({ onCompleteProfile }) {
         setDescription("");
         setCategory("Food");
 
+        apiRequestSuccess("Expense updated successfully!");
+        setTimeout(closeApiStatus, 1200);
+
         return;
       }
 
@@ -257,13 +303,19 @@ function Welcome({ onCompleteProfile }) {
       setAmount("");
       setDescription("");
       setCategory("Food");
+
+      apiRequestSuccess("Expense added successfully!");
+      setTimeout(closeApiStatus, 1200);
     } catch (error) {
       console.error("Error saving expense:", error);
 
-      alert(
+      const message =
         error.message ||
-          "Failed to save expense."
-      );
+        "Failed to save expense.";
+
+      apiRequestError(message);
+
+      alert(message);
     }
   };
 
@@ -291,6 +343,8 @@ function Welcome({ onCompleteProfile }) {
   // Delete expense
   const handleDeleteExpense = async (expenseId) => {
     try {
+      startApiRequest("Deleting expense...");
+
       const user = auth.currentUser;
 
       if (!user) {
@@ -326,13 +380,19 @@ function Welcome({ onCompleteProfile }) {
       }
 
       console.log("Expense successfully deleted");
+
+      apiRequestSuccess("Expense deleted successfully!");
+      setTimeout(closeApiStatus, 1200);
     } catch (error) {
       console.error("Error deleting expense:", error);
 
-      alert(
+      const message =
         error.message ||
-          "Failed to delete expense."
-      );
+        "Failed to delete expense.";
+
+      apiRequestError(message);
+
+      alert(message);
     }
   };
 
